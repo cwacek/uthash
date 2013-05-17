@@ -65,6 +65,22 @@ typedef unsigned char uint8_t;
 #include <inttypes.h>   /* uint32_t */
 #endif
 
+#ifdef USE_64B_COUNTERS
+typedef uint64_t counter_t;
+#else
+typedef uint32_t counter_t;
+#endif
+
+#ifdef USE_64B_HASHING
+typedef uint64_t hashval_t;
+#define FNV_PRIME 1099511628211ULL
+#define FNV_OFFSET 14695981039346656037ULL
+#else
+typedef unsigned hashval_t;
+#define FNV_PRIME 16777619
+#define FNV_OFFSET 2166136261
+#endif
+
 #define UTHASH_VERSION 1.9.8
 
 #ifndef uthash_fatal
@@ -355,7 +371,7 @@ do {                                                                            
 /* The Bernstein hash function, used in Perl prior to v5.6 */
 #define HASH_BER(key,keylen,num_bkts,hashv,bkt)                                  \
 do {                                                                             \
-  unsigned _hb_keylen=keylen;                                                    \
+  hashval_t _hb_keylen=keylen;                                                    \
   char *_hb_key=(char*)(key);                                                    \
   (hashv) = 0;                                                                   \
   while (_hb_keylen--)  { (hashv) = ((hashv) * 33) + *_hb_key++; }               \
@@ -367,7 +383,7 @@ do {                                                                            
  * http://eternallyconfuzzled.com/tuts/algorithms/jsw_tut_hashing.aspx */
 #define HASH_SAX(key,keylen,num_bkts,hashv,bkt)                                  \
 do {                                                                             \
-  unsigned _sx_i;                                                                \
+  counter_t _sx_i;                                                                \
   char *_hs_key=(char*)(key);                                                    \
   hashv = 0;                                                                     \
   for(_sx_i=0; _sx_i < keylen; _sx_i++)                                          \
@@ -377,17 +393,17 @@ do {                                                                            
 
 #define HASH_FNV(key,keylen,num_bkts,hashv,bkt)                                  \
 do {                                                                             \
-  unsigned _fn_i;                                                                \
+  counter_t _fn_i;                                                                \
   char *_hf_key=(char*)(key);                                                    \
-  hashv = 2166136261UL;                                                          \
+  hashv = FNV_OFFSET;                                                  \
   for(_fn_i=0; _fn_i < keylen; _fn_i++)                                          \
-      hashv = (hashv * 16777619) ^ _hf_key[_fn_i];                               \
+      hashv = (hashv * FNV_PRIME) ^ _hf_key[_fn_i];                               \
   bkt = hashv & (num_bkts-1);                                                    \
 } while(0) 
  
 #define HASH_OAT(key,keylen,num_bkts,hashv,bkt)                                  \
 do {                                                                             \
-  unsigned _ho_i;                                                                \
+  counter_t _ho_i;                                                                \
   char *_ho_key=(char*)(key);                                                    \
   hashv = 0;                                                                     \
   for(_ho_i=0; _ho_i < keylen; _ho_i++) {                                        \
@@ -666,8 +682,8 @@ do {                                                                            
  */
 #define HASH_EXPAND_BUCKETS(tbl)                                                 \
 do {                                                                             \
-    unsigned _he_bkt;                                                            \
-    unsigned _he_bkt_i;                                                          \
+    counter_t _he_bkt;                                                            \
+    counter_t _he_bkt_i;                                                          \
     struct UT_hash_handle *_he_thh, *_he_hh_nxt;                                 \
     UT_hash_bucket *_he_new_buckets, *_he_newbkt;                                \
     if ((UINT_MAX/2) < tbl->num_buckets) { uthash_fatal("Max 32bit buckets exceeded"); } \
@@ -720,8 +736,8 @@ do {                                                                            
 #define HASH_SORT(head,cmpfcn) HASH_SRT(hh,head,cmpfcn)
 #define HASH_SRT(hh,head,cmpfcn)                                                 \
 do {                                                                             \
-  unsigned _hs_i;                                                                \
-  unsigned _hs_looping,_hs_nmerges,_hs_insize,_hs_psize,_hs_qsize;               \
+  counter_t _hs_i;                                                                \
+  counter_t _hs_looping,_hs_nmerges,_hs_insize,_hs_psize,_hs_qsize;               \
   struct UT_hash_handle *_hs_p, *_hs_q, *_hs_e, *_hs_list, *_hs_tail;            \
   if (head) {                                                                    \
       _hs_insize = 1;                                                            \
@@ -804,7 +820,7 @@ do {                                                                            
  * hash handle that must be present in the structure. */
 #define HASH_SELECT(hh_dst, dst, hh_src, src, cond)                              \
 do {                                                                             \
-  unsigned _src_bkt, _dst_bkt;                                                   \
+  counter_t _src_bkt, _dst_bkt;                                                   \
   void *_last_elt=NULL, *_elt;                                                   \
   UT_hash_handle *_src_hh, *_dst_hh, *_last_elt_hh=NULL;                         \
   ptrdiff_t _dst_hho = ((char*)(&(dst)->hh_dst) - (char*)(dst));                 \
@@ -873,7 +889,7 @@ for((el)=(head),(tmp)=DECLTYPE(el)((head)?(head)->hh.next:NULL);                
 
 typedef struct UT_hash_bucket {
    struct UT_hash_handle *hh_head;
-   unsigned count;
+   counter_t count;
 
    /* expand_mult is normally set to 0. In this situation, the max chain length
     * threshold is enforced at its default value, HASH_BKT_CAPACITY_THRESH. (If
@@ -887,7 +903,7 @@ typedef struct UT_hash_bucket {
     * It is better to let its chain length grow to a longer yet-still-bounded
     * value, than to do an O(n) bucket expansion too often. 
     */
-   unsigned expand_mult;
+   counter_t expand_mult;
 
 } UT_hash_bucket;
 
@@ -897,19 +913,19 @@ typedef struct UT_hash_bucket {
 
 typedef struct UT_hash_table {
    UT_hash_bucket *buckets;
-   unsigned num_buckets, log2_num_buckets;
-   unsigned num_items;
+   counter_t num_buckets, log2_num_buckets;
+   counter_t num_items;
    struct UT_hash_handle *tail; /* tail hh in app order, for fast append    */
    ptrdiff_t hho; /* hash handle offset (byte pos of hash handle in element */
 
    /* in an ideal situation (all buckets used equally), no bucket would have
     * more than ceil(#items/#buckets) items. that's the ideal chain length. */
-   unsigned ideal_chain_maxlen;
+   counter_t ideal_chain_maxlen;
 
    /* nonideal_items is the number of items in the hash whose chain position
     * exceeds the ideal chain maxlen. these items pay the penalty for an uneven
     * hash distribution; reaching them in a chain traversal takes >ideal steps */
-   unsigned nonideal_items;
+   counter_t nonideal_items;
 
    /* ineffective expands occur when a bucket doubling was performed, but 
     * afterward, more than half the items in the hash had nonideal chain
@@ -917,7 +933,7 @@ typedef struct UT_hash_table {
     * further expansion, as it's not helping; this happens when the hash
     * function isn't a good fit for the key domain. When expansion is inhibited
     * the hash will still work, albeit no longer in constant time. */
-   unsigned ineff_expands, noexpand;
+   counter_t ineff_expands, noexpand;
 
    uint32_t signature; /* used only to find hash tables in external analysis */
 #ifdef HASH_BLOOM

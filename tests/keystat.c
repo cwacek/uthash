@@ -204,7 +204,11 @@ int main(int argc, char *argv[]) {
     timersub(&end_tm, &start_tm, &elapsed_tm3);
 
     if (!err) {
+#ifdef USE_64B_COUNTERS
+        printf("%.3f,%llu,%llu,%d,%s,%ld,%ld,%ld\n",
+#else
         printf("%.3f,%d,%d,%d,%s,%ld,%ld,%ld\n",
+#endif
         1-(1.0*keys->hh.tbl->nonideal_items/keys->hh.tbl->num_items), 
         keys->hh.tbl->num_items, 
         keys->hh.tbl->num_buckets, 
