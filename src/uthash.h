@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string.h>   /* memcmp,strlen */
 #include <stddef.h>   /* ptrdiff_t */
+#include <limits.h>
 #include <stdlib.h>   /* exit() */
 
 /* These macros use decltype or the earlier __typeof GNU extension.
@@ -669,6 +670,7 @@ do {                                                                            
     unsigned _he_bkt_i;                                                          \
     struct UT_hash_handle *_he_thh, *_he_hh_nxt;                                 \
     UT_hash_bucket *_he_new_buckets, *_he_newbkt;                                \
+    if ((UINT_MAX/2) < tbl->num_buckets) { uthash_fatal("Max 32bit buckets exceeded"); } \
     _he_new_buckets = (UT_hash_bucket*)uthash_malloc(                            \
              2 * tbl->num_buckets * sizeof(struct UT_hash_bucket));              \
     if (!_he_new_buckets) { uthash_fatal( "out of memory"); }                    \
